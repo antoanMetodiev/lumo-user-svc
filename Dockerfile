@@ -1,33 +1,22 @@
-# Етап 1: Build
-FROM eclipse-temurin:21-jdk AS build
+# Build stage
+FROM golang:1.25-bookworm AS build
 
 WORKDIR /app
 
-# Копиране на Gradle wrapper и скриптове
-COPY gradlew .
-COPY gradle ./gradle
-COPY build.gradle .
-COPY settings.gradle .
-COPY src ./src
+COPY go.mod go.sum ./
+RUN go mod download
 
-RUN chmod +x gradlew
+COPY cmd ./cmd
+COPY internal ./internal
 
-# Build
-RUN ./gradlew bootJar --no-daemon
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/server ./cmd/server
 
-# Етап 2: Финален образ
-FROM eclipse-temurin:21-jdk-jammy
+# Final stage — static binary, no JDK/JRE, minimal base image.
+FROM gcr.io/distroless/static-debian12
 
 WORKDIR /app
+COPY --from=build /app/server /app/server
 
 EXPOSE 8083
 
-COPY --from=build /app/build/libs/*.jar app.jar
-
-# -XX:MaxRAMPercentage caps the heap explicitly for Render's free-tier 512MB
-# container (the JDK's own container-aware default, 25%, leaves too little
-# headroom above it and too much below it to reason about); MaxMetaspaceSize
-# bounds Spring's reflection-heavy class metadata so it can't itself balloon
-# unbounded; ExitOnOutOfMemoryError makes an OOM a clean container restart
-# instead of a wedged, half-alive JVM.
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70.0", "-XX:MaxMetaspaceSize=96m", "-XX:+ExitOnOutOfMemoryError", "-jar", "app.jar"]
+ENTRYPOINT ["/app/server"]

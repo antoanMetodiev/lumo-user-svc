@@ -5,7 +5,7 @@ owns identity now. This service only:
 
 1. Keeps a local `users` row per Clerk account in sync, via a webhook Clerk
    calls whenever a user signs up / updates their profile / deletes their
-   account (`ClerkWebhookController` → `/webhooks/clerk`).
+   account (`internal/clerkwebhook` → `POST /webhooks/clerk`).
 2. Trusts that whoever's asking on the one endpoint that needs to know who's
    asking (`GET /user/me`, plus `/watchlist` and `/last-viewed`) has already
    been verified — by `lumo-api-gateway`, not by this service.
@@ -13,7 +13,7 @@ owns identity now. This service only:
 **This service no longer talks to Clerk's JWKS at all.** Verifying the
 session JWT (`Authorization: Bearer <token>`) now happens exactly once, in
 `lumo-api-gateway`. This service instead trusts two headers the gateway
-forwards on every request it proxies through — see `GatewayAuthenticationFilter`:
+forwards on every request it proxies through — see `internal/gatewayauth`:
 
 - `X-Clerk-User-Id` — the Clerk user id the gateway already verified.
 - `X-Internal-Api-Key` — a shared secret proving the caller really is the
@@ -28,26 +28,19 @@ more `getToken()` shortcut here.
 
 ## 1. Environment variables
 
-Add these wherever you run the service (local `.env`, IntelliJ run config,
-Render env vars, etc — same mechanism as `DATABASE_URL` already uses):
-
 | Variable | Where to find it |
 |---|---|
 | `CLERK_WEBHOOK_SECRET` | Created in step 2 below — looks like `whsec_...`. This is the **production** value; leave it as-is once set. |
 | `CLERK_WEBHOOK_SECRET_LOCAL` | Optional, local dev only. When you register an ngrok tunnel as a webhook endpoint for local testing, Clerk gives that endpoint its own separate signing secret — put that one here instead of overwriting `CLERK_WEBHOOK_SECRET`. Unset in production, so it always falls through to the real one there. |
 | `INTERNAL_SERVICE_SECRET` | Any long random string you generate yourself — must be the **exact same value** set on `lumo-api-gateway` (and `lumo-payments-svc`). |
+| `GATEWAY_URL` | Where `lumo-api-gateway` lives — defaults to the production URL; override for local dev. |
 
 Plus the existing `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` for
-the new Postgres database you set up.
+the Postgres database (the Go binary connects with `pgx` directly — see
+`internal/dbx` — no ORM/auto-migration; the schema below must already exist).
 
-`gateway.url` in `application.properties` (used by `GatewayClientConfig` to
-tell lumo-payments-svc about deleted accounts — see `PaymentsSyncService`) is
-a manual local/prod line swap, same pattern as `lumo-payments-svc`'s own
-`gateway.url` — keep the active line pointed at localhost while developing,
-swap to the commented-out production line before deploying.
-
-`CLERK_ISSUER` / `CLERK_JWKS_URL` now live on `lumo-api-gateway` instead —
-that's the only service left that needs them.
+`CLERK_ISSUER` / `CLERK_JWKS_URL` live on `lumo-api-gateway` instead — that's
+the only service left that needs them.
 
 ## 2. Register the webhook in the Clerk dashboard
 
@@ -69,17 +62,15 @@ components on the frontend automatically show whatever's enabled here.
 
 ## 4. Database
 
-New table, `users`, created automatically by Hibernate
-(`spring.jpa.hibernate.ddl-auto=update`) on the new database you set up:
+Three tables, already existing in production (created back when this was a
+Hibernate `ddl-auto=update` service — the Go rewrite reads/writes them with
+plain SQL via `internal/dbx`, no migrations of its own):
 
-| Column | Notes |
+| Table | Notes |
 |---|---|
-| `clerk_id` (PK) | Clerk's user id, e.g. `user_2abc...` |
-| `email` | |
-| `display_name` | First + last name from Clerk, if set |
-| `profile_image_url` | |
-| `subscription_type` | `REGULAR_USER` (default) or `PRO_USER` — set by `lumo-payments-svc` once Stripe billing is wired up |
-| `created_at` / `updated_at` | |
+| `users` | `clerk_id` (PK, e.g. `user_2abc...`), `email`, `display_name`, `profile_image_url`, `subscription_type` (`REGULAR_USER`/`PRO_USER`), `created_at`/`updated_at`. |
+| `watchlist_items` | Per-user saved titles, unique on `(clerk_id, record_id)`, capped at 20/user (oldest evicted). |
+| `last_viewed_items` | Per-user view history, unique on `(clerk_id, title)`, capped at 20/user (oldest evicted). |
 
 ## 5. Testing it end to end
 
