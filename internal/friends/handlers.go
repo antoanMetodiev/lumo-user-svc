@@ -181,7 +181,7 @@ func (h *Handlers) accept(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	writeJSON(w, map[string]string{"status": StatusAccepted})
+	writeJSON(w, map[string]string{"status": "ACCEPTED"})
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

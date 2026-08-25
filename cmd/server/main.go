@@ -23,6 +23,7 @@ import (
 	"lumo-user-svc/internal/gatewayauth"
 	"lumo-user-svc/internal/heartbeat"
 	"lumo-user-svc/internal/lastviewed"
+	"lumo-user-svc/internal/likes"
 	"lumo-user-svc/internal/metrics"
 	"lumo-user-svc/internal/reqlog"
 	"lumo-user-svc/internal/users"
@@ -30,7 +31,7 @@ import (
 )
 
 // userScopedPaths mirrors SecurityConfig.USER_SCOPED_PATHS exactly.
-var userScopedPaths = []string{"/user/me", "/watchlist", "/last-viewed", "/friends"}
+var userScopedPaths = []string{"/user/me", "/watchlist", "/last-viewed", "/friends", "/likes"}
 
 // internalPaths mirrors SecurityConfig.INTERNAL_PATHS exactly.
 var internalPaths = []string{"/internal"}
@@ -65,6 +66,9 @@ func main() {
 	lastViewedRepo := lastviewed.NewRepository(pool)
 	lastViewedSvc := lastviewed.NewService(lastViewedRepo)
 
+	likesRepo := likes.NewRepository(pool)
+	likesSvc := likes.NewService(likesRepo)
+
 	friendsRepo := friends.NewRepository(pool)
 	friendsNotifier := friends.NewNotifyClient(cfg.GatewayURL, cfg.InternalSecret)
 	friendsSvc := friends.NewService(friendsRepo, usersRepo, friendsNotifier)
@@ -76,6 +80,7 @@ func main() {
 	users.NewHandlers(usersSvc).Register(mux)
 	watchlist.NewHandlers(watchlistSvc).Register(mux)
 	lastviewed.NewHandlers(lastViewedSvc).Register(mux)
+	likes.NewHandlers(likesSvc).Register(mux)
 	friends.NewHandlers(friendsSvc).Register(mux)
 	clerkwebhook.NewHandlers(cfg.ClerkWebhookSecret, clerkWebhookSvc).Register(mux)
 	heartbeat.Register(mux)

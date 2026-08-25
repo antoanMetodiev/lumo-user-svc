@@ -50,6 +50,21 @@ type WatchlistItem struct {
 	AddedAt      time.Time `json:"addedAt"`
 }
 
+// LikedItem is a new entity (no Java original) — same shape as
+// WatchlistItem, see internal/likes's package doc comment for why.
+type LikedItem struct {
+	ID           uuid.UUID `json:"id"`
+	ClerkID      string    `json:"clerkId"`
+	RecordID     string    `json:"recordId"`
+	TmdbID       *string   `json:"tmdbId"`
+	Title        *string   `json:"title"`
+	PosterImgURL *string   `json:"posterImgURL"`
+	TmdbRating   *string   `json:"tmdbRating"`
+	Type         *string   `json:"type"`
+	VideoID      *string   `json:"videoId"`
+	LikedAt      time.Time `json:"likedAt"`
+}
+
 // LastViewedItem mirrors feather.models.LastViewedItem.
 type LastViewedItem struct {
 	ID          uuid.UUID `json:"id"`
