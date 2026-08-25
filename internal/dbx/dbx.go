@@ -1,8 +1,18 @@
-// Package dbx wires up the Postgres connection pool. Pool sizing mirrors the
-// Java service's HikariCP settings (application.properties): max 5, min idle
-// 1, 30s idle timeout — same reasoning applies here (this DB tier's
-// connection-slot budget is shared across every lumo-* service, so an idle
-// Go instance shouldn't camp on 5 open connections either).
+// Package dbx wires up the Postgres connection pool. Max/min conn counts
+// mirror the Java service's HikariCP settings (application.properties):
+// max 5, min idle 1 — this DB tier's connection-slot budget is shared
+// across every lumo-* service, so an idle Go instance shouldn't camp on 5
+// open connections either.
+//
+// MaxConnIdleTime deliberately does NOT mirror HikariCP's 30s here (that
+// was traced as a real, measured cause of sluggish search results, 2026-08:
+// with only 1-2 users clicking around interactively — gaps of way more
+// than 30s between requests — the pool's one MinConns connection kept
+// getting recycled, so nearly every request paid a fresh TCP+TLS+Postgres
+// handshake, measured at ~360ms against this Aiven instance, versus ~50ms
+// for the same query on an already-warm connection). 5 minutes comfortably
+// covers normal interactive gaps while still not camping on a connection
+// during genuinely idle stretches.
 package dbx
 
 import (
@@ -75,7 +85,7 @@ func Dial(ctx context.Context, rawURL, username, password string) (*pgxpool.Pool
 
 	poolCfg.MaxConns = 5
 	poolCfg.MinConns = 1
-	poolCfg.MaxConnIdleTime = 30 * time.Second
+	poolCfg.MaxConnIdleTime = 5 * time.Minute
 	poolCfg.ConnConfig.ConnectTimeout = 10 * time.Second
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
