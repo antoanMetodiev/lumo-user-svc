@@ -1,21 +1,40 @@
 // Package likes mirrors internal/watchlist's exact shape — "like a movie or
 // series" is the same "does this user have this record on some list" pattern
-// watchlist already established, just a different list with no capacity cap
-// (a like is a lighter, uncapped signal, not a bounded "queue to watch").
-// No listing UI yet by design (per the user, 2026-08) — GetLikes exists for
-// when that lands, but nothing renders it today.
+// watchlist already established, just a different list.
+//
+// Visibility policy (revised, 2026-08): likes were originally public to any
+// signed-in caller, no friendship required. The user reversed that call —
+// liked titles are now friendship-gated exactly like playlists.Service's
+// ListForUser (own likes always visible; someone else's only if you're
+// their friend; a non-friend gets an empty slice rather than a 403/404 that
+// would confirm the target has likes at all).
+//
+// Capacity (added 2026-08, per the user): capped at maxItems, unlike
+// watchlist's evict-the-oldest-and-keep-going behavior — AddLike rejects
+// outright once at capacity (ErrLimitReached) rather than silently dropping
+// an old like to make room. The cap itself isn't surfaced anywhere upfront
+// (no "12/30" counter) — the caller only learns about it if they actually
+// hit it.
 package likes
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"lumo-user-svc/internal/friends"
 	"lumo-user-svc/internal/models"
 )
+
+const maxItems = 30
+
+// ErrLimitReached is returned by AddLike once the caller already has
+// maxItems liked titles.
+var ErrLimitReached = errors.New("like limit reached")
 
 type Repository struct {
 	pool *pgxpool.Pool
@@ -75,17 +94,41 @@ func (r *Repository) DeleteByClerkIDAndRecordID(ctx context.Context, clerkID, re
 	return err
 }
 
-// Service mirrors watchlist.Service.
-type Service struct {
-	repo *Repository
+func (r *Repository) CountByClerkID(ctx context.Context, clerkID string) (int64, error) {
+	var count int64
+	err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM liked_items WHERE clerk_id = $1", clerkID).Scan(&count)
+	return count, err
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+// Service mirrors watchlist.Service.
+type Service struct {
+	repo        *Repository
+	friendsRepo *friends.Repository
+}
+
+func NewService(repo *Repository, friendsRepo *friends.Repository) *Service {
+	return &Service{repo: repo, friendsRepo: friendsRepo}
 }
 
 func (s *Service) GetLikes(ctx context.Context, clerkID string) ([]models.LikedItem, error) {
 	return s.repo.FindByClerkIDOrderByLikedAtDesc(ctx, clerkID)
+}
+
+// GetLikesForUser is GetLikes' friendship-gated counterpart — see the
+// package doc comment. callerID == targetID (viewing your own profile
+// through this same path) always sees everything.
+func (s *Service) GetLikesForUser(ctx context.Context, callerID, targetID string) ([]models.LikedItem, error) {
+	if callerID == targetID {
+		return s.GetLikes(ctx, targetID)
+	}
+	areFriends, err := s.friendsRepo.AreFriends(ctx, callerID, targetID)
+	if err != nil {
+		return nil, err
+	}
+	if !areFriends {
+		return []models.LikedItem{}, nil
+	}
+	return s.GetLikes(ctx, targetID)
 }
 
 // AddLikeRequest mirrors watchlist.AddToWatchlistRequest's shape.
@@ -100,7 +143,9 @@ type AddLikeRequest struct {
 }
 
 // AddLike returns the existing like unchanged if this recordId is already
-// liked — idempotent, same as AddToWatchlist, no capacity cap to enforce.
+// liked — idempotent, same as AddToWatchlist. Unlike watchlist, hitting
+// capacity rejects the add (ErrLimitReached) instead of evicting the oldest
+// like to make room.
 func (s *Service) AddLike(ctx context.Context, clerkID string, req AddLikeRequest) (*models.LikedItem, error) {
 	existing, err := s.repo.FindByClerkIDAndRecordID(ctx, clerkID, req.RecordID)
 	if err != nil {
@@ -108,6 +153,14 @@ func (s *Service) AddLike(ctx context.Context, clerkID string, req AddLikeReques
 	}
 	if existing != nil {
 		return existing, nil
+	}
+
+	count, err := s.repo.CountByClerkID(ctx, clerkID)
+	if err != nil {
+		return nil, err
+	}
+	if count >= maxItems {
+		return nil, ErrLimitReached
 	}
 
 	item := &models.LikedItem{

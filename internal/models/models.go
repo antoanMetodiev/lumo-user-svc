@@ -65,6 +65,34 @@ type LikedItem struct {
 	LikedAt      time.Time `json:"likedAt"`
 }
 
+// Playlist is a new entity (no Java original) — a named, owned collection of
+// movies/series. IsPublic governs friend-visibility only (see
+// internal/playlists's package doc comment) — it does not make a playlist
+// visible to every signed-in user the way Likes are.
+type Playlist struct {
+	ID        uuid.UUID `json:"id"`
+	OwnerID   string    `json:"ownerId"`
+	Name      string    `json:"name"`
+	IsPublic  bool      `json:"isPublic"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// PlaylistItem is a new entity — same shape as LikedItem/WatchlistItem, one
+// row per movie/series in a given playlist.
+type PlaylistItem struct {
+	ID           uuid.UUID `json:"id"`
+	PlaylistID   uuid.UUID `json:"playlistId"`
+	RecordID     string    `json:"recordId"`
+	TmdbID       *string   `json:"tmdbId"`
+	Title        *string   `json:"title"`
+	PosterImgURL *string   `json:"posterImgURL"`
+	TmdbRating   *string   `json:"tmdbRating"`
+	Type         *string   `json:"type"`
+	VideoID      *string   `json:"videoId"`
+	AddedAt      time.Time `json:"addedAt"`
+}
+
 // LastViewedItem mirrors feather.models.LastViewedItem.
 type LastViewedItem struct {
 	ID          uuid.UUID `json:"id"`

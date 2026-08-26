@@ -2,6 +2,7 @@ package likes
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -37,15 +38,14 @@ func (h *Handlers) getLikes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, items)
 }
 
-// getLikesForUser is deliberately public among any signed-in caller — no
-// friendship or other relationship check, per the user's explicit call:
-// what someone likes is visible to anyone on the platform, not gated behind
-// being friends first. Still requires a session (this whole path prefix is
-// in userScopedPaths), just not a specific one.
+// getLikesForUser is friendship-gated — see the Service.GetLikesForUser doc
+// comment (this was previously public to any signed-in caller; the user
+// reversed that call, 2026-08).
 func (h *Handlers) getLikesForUser(w http.ResponseWriter, r *http.Request) {
+	clerkID := gatewayauth.ClerkUserID(r)
 	targetClerkID := r.PathValue("clerkId")
 
-	items, err := h.svc.GetLikes(r.Context(), targetClerkID)
+	items, err := h.svc.GetLikesForUser(r.Context(), clerkID, targetClerkID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -69,6 +69,14 @@ func (h *Handlers) addLike(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.AddLike(r.Context(), clerkID, req)
 	if err != nil {
+		if errors.Is(err, ErrLimitReached) {
+			// 409, not 400 — the request itself is well-formed, it just
+			// conflicts with a capacity constraint. Lets the frontend
+			// distinguish "you're at the cap" from a generic validation
+			// failure without parsing the response body.
+			http.Error(w, "you can have at most 30 liked titles", http.StatusConflict)
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
