@@ -1,0 +1,36 @@
+
+  __    _   ___  
+ / /\  | | | |_) 
+/_/--\ |_| |_| \_ 
+v1.67.4, built with Go go1.26.7
+
+[21:32:31] watching .
+[21:32:31] watching cmd
+[21:32:31] watching cmd\diag
+[21:32:31] watching cmd\server
+[21:32:31] watching internal
+[21:32:31] watching internal\clerkwebhook
+[21:32:31] watching internal\config
+[21:32:31] watching internal\cors
+[21:32:31] watching internal\dbx
+[21:32:31] watching internal\friends
+[21:32:31] watching internal\gatewayauth
+[21:32:31] watching internal\heartbeat
+[21:32:31] watching internal\lastviewed
+[21:32:31] watching internal\likes
+[21:32:31] watching internal\metrics
+[21:32:31] watching internal\models
+[21:32:31] watching internal\playlists
+[21:32:31] watching internal\reqlog
+[21:32:31] watching internal\users
+[21:32:31] watching internal\watching
+[21:32:31] watching internal\watchlist
+[21:32:31] !exclude tmp
+[21:32:31] building...
+[21:32:33] !exclude .git
+[21:32:33] !exclude .git
+[21:32:34] running...
+2026/08/26 21:32:35 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/26 21:32:35 lumo-user-svc (Go) listening on :8083
+[21:45:50] !exclude .git
+[21:45:50] !exclude .git
