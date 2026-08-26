@@ -50,9 +50,17 @@ type wsEvent struct {
 // see it on their next poll or page load instead of instantly, so it's
 // logged, not returned as an error to the caller.
 func (n *NotifyClient) Notify(ctx context.Context, targetClerkID, eventType string, fr *FriendRequest) {
-	body, err := json.Marshal(wsEvent{Type: eventType, Request: fr})
+	n.NotifyRaw(ctx, targetClerkID, wsEvent{Type: eventType, Request: fr})
+}
+
+// NotifyRaw is Notify generalized to any JSON-marshalable payload — for
+// packages outside friends (e.g. watching) that want this same best-effort
+// gateway push without shoehorning their event into wsEvent's
+// FriendRequest-shaped body.
+func (n *NotifyClient) NotifyRaw(ctx context.Context, targetClerkID string, payload any) {
+	body, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("wsnotify: failed to marshal %s event for clerkId=%s: %v", eventType, targetClerkID, err)
+		log.Printf("wsnotify: failed to marshal payload for clerkId=%s: %v", targetClerkID, err)
 		return
 	}
 
