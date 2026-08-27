@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
+	"lumo-user-svc/internal/dbx"
 	"lumo-user-svc/internal/models"
 )
 
@@ -18,10 +18,10 @@ import (
 const maxItems = 20
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool dbx.Querier
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
+func NewRepository(pool dbx.Querier) *Repository {
 	return &Repository{pool: pool}
 }
 

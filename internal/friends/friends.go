@@ -24,8 +24,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
+	"lumo-user-svc/internal/dbx"
 	"lumo-user-svc/internal/users"
 )
 
@@ -68,10 +68,10 @@ func orderPair(a, b string) (string, string) {
 }
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool dbx.Querier
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
+func NewRepository(pool dbx.Querier) *Repository {
 	return &Repository{pool: pool}
 }
 

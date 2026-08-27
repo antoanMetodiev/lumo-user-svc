@@ -21,8 +21,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// Querier is the subset of *pgxpool.Pool's methods every internal/*
+// Repository actually calls (see dbx_test.go's grep-verified list — no
+// package here uses transactions, Copy, or Acquire). Repositories hold this
+// interface instead of *pgxpool.Pool directly so tests can substitute
+// pgxmock's mock pool (github.com/pashagolub/pgxmock/v4) without a live
+// Postgres — the same reasoning that already made clerkwebhook.Service
+// depend on a userStore interface instead of *users.Repository directly.
+// *pgxpool.Pool satisfies this structurally, so cmd/server/main.go needed no
+// changes to keep passing it straight to every NewRepository.
+type Querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
 
 // buildDSN turns Spring's three-part config (a possibly "jdbc:"-prefixed
 // DATABASE_URL plus separate DATABASE_USERNAME/DATABASE_PASSWORD) into a
