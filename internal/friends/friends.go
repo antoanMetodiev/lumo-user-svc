@@ -325,10 +325,22 @@ const searchSelectColumns = `
 	f.id IS NOT NULL AS is_friend,
 	fr.requester_id`
 
+// friendships' rows are written with (user_a_id, user_b_id) ordered by
+// orderPair, which sorts by plain Go byte-order — NOT the same ordering
+// Postgres's LEAST/GREATEST would produce under this DB's collation (which
+// can disagree with byte-order on mixed-case clerk_ids, e.g. an uppercase
+// letter sorting after a lowercase one under a locale-aware collation even
+// though it's smaller in ASCII). Joining via LEAST/GREATEST silently missed
+// real rows whenever the two orderings disagreed, showing "Add Friend" for
+// people who were already friends. Matching directly against both possible
+// (user_a_id, user_b_id) arrangements — same as ListFriendships already
+// does — sidesteps collation entirely instead of needing it to agree with
+// orderPair.
 const searchJoins = `
 	FROM users u
 	LEFT JOIN friendships f
-	  ON f.user_a_id = LEAST(u.clerk_id, $1) AND f.user_b_id = GREATEST(u.clerk_id, $1)
+	  ON (f.user_a_id = u.clerk_id AND f.user_b_id = $1)
+	  OR (f.user_a_id = $1 AND f.user_b_id = u.clerk_id)
 	LEFT JOIN friend_requests fr
 	  ON (fr.requester_id = u.clerk_id AND fr.addressee_id = $1)
 	  OR (fr.addressee_id = u.clerk_id AND fr.requester_id = $1)`
