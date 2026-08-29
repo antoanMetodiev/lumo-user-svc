@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"lumo-user-svc/internal/aiassistant"
 	"lumo-user-svc/internal/clerkwebhook"
 	"lumo-user-svc/internal/config"
 	"lumo-user-svc/internal/cors"
@@ -35,7 +36,7 @@ import (
 // userScopedPaths mirrors SecurityConfig.USER_SCOPED_PATHS exactly — plus
 // "/watching", a new-feature addition with no Java original (see friends'
 // own package doc comment for the precedent).
-var userScopedPaths = []string{"/user/me", "/watchlist", "/last-viewed", "/friends", "/likes", "/playlists", "/watching"}
+var userScopedPaths = []string{"/user/me", "/watchlist", "/last-viewed", "/friends", "/likes", "/playlists", "/watching", "/ai-assistant"}
 
 // internalPaths mirrors SecurityConfig.INTERNAL_PATHS exactly.
 var internalPaths = []string{"/internal"}
@@ -83,6 +84,9 @@ func main() {
 	watchingSvc := watching.NewService(friendsRepo, usersRepo, friendsNotifier)
 	go watchingSvc.StartSweeper(ctx)
 
+	aiAssistantRepo := aiassistant.NewRepository(pool)
+	aiAssistantSvc := aiassistant.NewService(aiAssistantRepo)
+
 	paymentsSync := clerkwebhook.NewPaymentsSync(cfg.GatewayURL, cfg.InternalSecret)
 	clerkWebhookSvc := clerkwebhook.NewService(usersRepo, paymentsSync)
 
@@ -94,6 +98,7 @@ func main() {
 	friends.NewHandlers(friendsSvc).Register(mux)
 	playlists.NewHandlers(playlistsSvc).Register(mux)
 	watching.NewHandlers(watchingSvc).Register(mux)
+	aiassistant.NewHandlers(aiAssistantSvc).Register(mux)
 	clerkwebhook.NewHandlers(cfg.ClerkWebhookSecret, clerkWebhookSvc).Register(mux)
 	heartbeat.Register(mux)
 

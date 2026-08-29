@@ -4,53 +4,351 @@
 /_/--\ |_| |_| \_ 
 v1.67.4, built with Go go1.26.7
 
-[21:32:31] watching .
-[21:32:31] watching cmd
-[21:32:31] watching cmd\diag
-[21:32:31] watching cmd\server
-[21:32:31] watching internal
-[21:32:31] watching internal\clerkwebhook
-[21:32:31] watching internal\config
-[21:32:31] watching internal\cors
-[21:32:31] watching internal\dbx
-[21:32:31] watching internal\friends
-[21:32:31] watching internal\gatewayauth
-[21:32:31] watching internal\heartbeat
-[21:32:31] watching internal\lastviewed
-[21:32:31] watching internal\likes
-[21:32:31] watching internal\metrics
-[21:32:31] watching internal\models
-[21:32:31] watching internal\playlists
-[21:32:31] watching internal\reqlog
-[21:32:31] watching internal\users
-[21:32:31] watching internal\watching
-[21:32:31] watching internal\watchlist
-[21:32:31] !exclude tmp
-[21:32:31] building...
-[21:32:33] !exclude .git
-[21:32:33] !exclude .git
-[21:32:34] running...
-2026/08/26 21:32:35 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
-2026/08/26 21:32:35 lumo-user-svc (Go) listening on :8083
-[21:45:50] !exclude .git
-[21:45:50] !exclude .git
-[21:45:51] !exclude .git
-[21:45:51] !exclude .git
-[21:45:52] !exclude .git
-[21:45:52] !exclude .git
-[21:45:52] !exclude .git
-[21:45:52] !exclude .git
-[21:45:52] !exclude .git
-[21:45:52] !exclude .git
-[21:46:11] !exclude .git
-[21:46:11] !exclude .git
-[21:46:11] !exclude .git
-[21:46:11] !exclude .git
-[21:46:12] !exclude .git
-[21:46:12] !exclude .git
-[21:46:12] !exclude .git
-[21:46:12] !exclude .git
-[21:46:12] !exclude .git
-[21:46:12] !exclude .git
-[21:46:41] !exclude .git
-[21:46:41] !exclude .git
+[23:49:34] watching .
+[23:49:34] watching cmd
+[23:49:34] watching cmd\diag
+[23:49:34] watching cmd\server
+[23:49:34] watching internal
+[23:49:34] watching internal\clerkwebhook
+[23:49:34] watching internal\config
+[23:49:34] watching internal\cors
+[23:49:34] watching internal\dbx
+[23:49:34] watching internal\friends
+[23:49:34] watching internal\gatewayauth
+[23:49:34] watching internal\heartbeat
+[23:49:34] watching internal\lastviewed
+[23:49:34] watching internal\likes
+[23:49:34] watching internal\metrics
+[23:49:34] watching internal\models
+[23:49:34] watching internal\playlists
+[23:49:34] watching internal\reqlog
+[23:49:34] watching internal\users
+[23:49:34] watching internal\watching
+[23:49:34] watching internal\watchlist
+[23:49:34] !exclude tmp
+[23:49:34] building...
+[23:49:35] !exclude .git
+[23:49:35] !exclude .git
+[23:49:45] running...
+2026/08/26 23:49:53 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/26 23:49:53 lumo-user-svc (Go) listening on :8083
+2026/08/27 00:00:00 database keep-alive ping ok
+[01:17:11] cmd\diag\main.go has changed
+[01:17:12] building...
+[01:17:12] Process Exit with Code: 1
+[01:17:13] !exclude .git
+[01:17:13] !exclude .git
+[01:17:16] running...
+2026/08/27 01:17:17 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/27 01:17:17 lumo-user-svc (Go) listening on :8083
+[01:21:05] watching cmd\diag
+[01:21:05] watching cmd\diag
+[01:21:05] cmd\diag\main.go has changed
+[01:21:06] Process Exit with Code: 1
+[01:21:06] building...
+[01:21:07] !exclude .git
+[01:21:08] !exclude .git
+[01:21:09] running...
+2026/08/27 01:21:10 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/27 01:21:10 lumo-user-svc (Go) listening on :8083
+[01:35:14] watching cmd\diag
+[01:35:14] watching cmd\diag
+[01:35:15] cmd\diag\main.go has changed
+[01:35:15] Process Exit with Code: 1
+[01:35:15] building...
+[01:35:16] !exclude .git
+[01:35:16] !exclude .git
+[01:35:17] running...
+2026/08/27 01:35:18 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/27 01:35:18 lumo-user-svc (Go) listening on :8083
+[01:47:13] !exclude .git
+[01:47:13] !exclude .git
+[01:47:14] !exclude .git
+[01:47:14] !exclude .git
+[01:47:14] !exclude .git
+[01:47:14] !exclude .git
+[01:47:14] !exclude .git
+[01:47:14] !exclude .git
+[01:47:14] !exclude .git
+[01:47:14] !exclude .git
+[02:46:10] watching internal\dbx
+[02:46:10] watching internal\dbx
+[02:46:11] internal\dbx\dbx.go has changed
+[02:46:11] Process Exit with Code: 1
+[02:46:11] building...
+[02:46:12] !exclude .git
+[02:46:13] !exclude .git
+[02:46:15] watching internal\users
+[02:46:15] watching internal\users
+[02:46:16] internal\users\users.go has changed
+[02:46:16] building...
+[02:46:17] !exclude .git
+[02:46:17] !exclude .git
+[02:46:20] watching internal\friends
+[02:46:20] watching internal\friends
+[02:46:20] internal\friends\friends.go has changed
+[02:46:20] building...
+[02:46:22] !exclude .git
+[02:46:22] !exclude .git
+[02:46:23] watching internal\friends
+[02:46:23] watching internal\friends
+[02:46:24] internal\friends\friends.go has changed
+[02:46:24] building...
+[02:46:27] !exclude .git
+[02:46:27] !exclude .git
+[02:46:29] watching internal\likes
+[02:46:29] watching internal\likes
+[02:46:30] internal\likes\likes.go has changed
+[02:46:30] building...
+# lumo-user-svc/internal/likes
+internal\likes\likes.go:28:2: could not import lumo-user-svc/internal/dbx (open : The system cannot find the file specified.)
+[02:46:31] failed to build, error: exit status 1
+[02:46:33] !exclude .git
+[02:46:33] !exclude .git
+[02:46:34] watching internal\playlists
+[02:46:34] watching internal\playlists
+[02:46:34] internal\playlists\playlists.go has changed
+[02:46:34] building...
+# lumo-user-svc/internal/playlists
+internal\playlists\playlists.go:21:2: could not import lumo-user-svc/internal/dbx (open : The system cannot find the file specified.)
+internal\playlists\playlists.go:42:8: undefined: pgxpool
+internal\playlists\playlists.go:45:26: undefined: pgxpool
+[02:46:36] failed to build, error: exit status 1
+[02:46:36] !exclude .git
+[02:46:36] !exclude .git
+[02:46:37] watching internal\playlists
+[02:46:37] watching internal\playlists
+[02:46:38] internal\playlists\playlists.go has changed
+[02:46:38] building...
+[02:46:40] !exclude .git
+[02:46:40] !exclude .git
+[02:46:43] watching internal\watchlist
+[02:46:43] watching internal\watchlist
+[02:46:44] internal\watchlist\watchlist.go has changed
+[02:46:44] building...
+[02:46:47] !exclude .git
+[02:46:47] !exclude .git
+[02:46:49] watching internal\lastviewed
+[02:46:49] watching internal\lastviewed
+[02:46:49] internal\lastviewed\lastviewed.go has changed
+[02:46:49] building...
+# lumo-user-svc/internal/lastviewed
+internal\lastviewed\lastviewed.go:12:2: could not import lumo-user-svc/internal/dbx (open : The system cannot find the file specified.)
+[02:46:53] failed to build, error: exit status 1
+[02:46:54] !exclude .git
+[02:46:54] !exclude .git
+[02:46:58] !exclude .git
+[02:46:58] !exclude .git
+[02:47:05] running...
+[02:47:14] running...
+[02:47:14] running...
+[02:47:18] Process Exit with Code: 1
+2026/08/27 02:47:25 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/27 02:47:25 lumo-user-svc (Go) listening on :8083
+2026/08/27 02:47:25 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/27 02:47:25 lumo-user-svc (Go) listening on :8083
+2026/08/27 02:47:25 server error: listen tcp :8083: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+[02:47:25] Process Exit with Code: 1
+[02:48:44] watching internal\users
+[02:48:44] watching internal\users
+[02:50:19] watching internal\clerkwebhook
+[02:50:19] failed to watch D:\Programming\Personal Projects\AuroraStream\lumo-user-svc\internal\clerkwebhook\clerk_event_test.go.tmp.15848.1dac48e353d5, error: GetFileAttributes: The system cannot find the file specified.
+[02:50:19] failed to watching D:\Programming\Personal Projects\AuroraStream\lumo-user-svc\internal\clerkwebhook, error: GetFileAttributes: The system cannot find the file specified.
+[02:50:19] watching internal\clerkwebhook
+[02:51:11] watching internal\clerkwebhook
+[02:51:11] watching internal\clerkwebhook
+[02:51:23] watching internal\clerkwebhook
+[02:51:23] watching internal\clerkwebhook
+[02:51:42] watching internal\clerkwebhook
+[02:51:42] watching internal\clerkwebhook
+[02:51:46] watching internal\clerkwebhook
+[02:51:46] watching internal\clerkwebhook
+[02:51:52] !exclude .git
+[02:51:52] !exclude .git
+[02:52:44] watching cmd\diag
+[02:52:45] cmd\diag\main.go has changed
+[02:52:45] building...
+[02:52:46] !exclude .git
+[02:52:46] !exclude .git
+[02:52:47] running...
+2026/08/27 02:52:48 metrics: GRAFANA_OTLP_ENABLED is not "true" — OTLP export disabled
+2026/08/27 02:52:48 lumo-user-svc (Go) listening on :8083
+2026/08/27 02:52:48 server error: listen tcp :8083: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+[02:52:48] Process Exit with Code: 1
+[02:53:34] watching internal\gatewayauth
+[02:53:34] watching internal\gatewayauth
+[02:53:53] watching internal\cors
+[02:53:53] watching internal\cors
+[02:54:10] watching internal\watching
+[02:54:10] watching internal\watching
+[02:54:17] watching internal\likes
+[02:54:17] watching internal\likes
+[02:54:19] watching internal\config
+[02:54:19] watching internal\config
+[02:54:50] watching internal\likes
+[02:54:50] watching internal\likes
+[02:54:55] watching internal\likes
+[02:54:55] watching internal\likes
+[02:54:56] watching internal\dbx
+[02:54:56] watching internal\dbx
+[02:54:56] watching internal\likes
+[02:54:56] watching internal\likes
+[02:55:03] watching internal\watching
+[02:55:03] watching internal\watching
+[02:55:06] watching internal\heartbeat
+[02:55:06] watching internal\heartbeat
+[02:55:08] watching internal\watching
+[02:55:08] watching internal\watching
+[02:55:30] watching internal\reqlog
+[02:55:30] watching internal\reqlog
+[02:55:40] watching internal\watchlist
+[02:55:40] watching internal\watchlist
+[02:55:40] !exclude .git
+[02:55:40] !exclude .git
+[02:56:03] watching internal\watchlist
+[02:56:03] watching internal\watchlist
+[02:56:08] watching internal\watchlist
+[02:56:08] watching internal\watchlist
+[02:56:11] watching internal\watchlist
+[02:56:11] watching internal\watchlist
+[02:56:17] watching internal\playlists
+[02:56:17] watching internal\playlists
+[02:56:25] watching internal\watching
+[02:56:25] watching internal\watching
+[02:56:29] watching internal\watching
+[02:56:29] watching internal\watching
+[02:56:30] watching internal\users
+[02:56:30] watching internal\users
+[02:56:36] !exclude .git
+[02:56:36] !exclude .git
+[02:56:37] watching internal\users
+[02:56:37] watching internal\users
+[02:56:42] watching internal\users
+[02:56:42] watching internal\users
+[02:56:46] watching internal\lastviewed
+[02:56:46] watching internal\lastviewed
+[02:56:46] watching internal\users
+[02:56:46] watching internal\users
+[02:56:52] watching internal\users
+[02:56:52] watching internal\users
+[02:56:54] !exclude .git
+[02:56:54] !exclude .git
+[02:57:00] !exclude .git
+[02:57:01] !exclude .git
+[02:57:02] !exclude .git
+[02:57:02] !exclude .git
+[02:57:09] watching internal\lastviewed
+[02:57:09] watching internal\lastviewed
+[02:57:16] !exclude .git
+[02:57:16] !exclude .git
+[02:57:16] watching internal\users
+[02:57:16] watching internal\users
+[02:57:22] watching internal\playlists
+[02:57:22] watching internal\playlists
+[02:57:23] watching internal\users
+[02:57:23] watching internal\users
+[02:57:24] !exclude .git
+[02:57:24] !exclude .git
+[02:57:31] !exclude .git
+[02:57:31] !exclude .git
+[02:57:42] watching internal\watching
+[02:57:42] watching internal\watching
+[02:57:50] watching internal\watching
+[02:57:50] watching internal\watching
+[02:57:55] watching internal\watching
+[02:57:55] watching internal\watching
+[02:57:57] !exclude .git
+[02:57:57] !exclude .git
+[02:58:05] watching internal\watching
+[02:58:05] watching internal\watching
+[02:58:05] watching internal\lastviewed
+[02:58:05] watching internal\lastviewed
+[02:58:09] watching internal\watchlist
+[02:58:09] watching internal\watchlist
+[02:58:14] watching internal\watching
+[02:58:14] watching internal\watching
+[02:58:15] watching internal\watchlist
+[02:58:15] watching internal\watchlist
+[02:58:18] watching internal\watchlist
+[02:58:18] watching internal\watchlist
+[02:58:19] watching internal\watching
+[02:58:20] watching internal\watching
+[02:58:22] watching internal\watchlist
+[02:58:22] watching internal\watchlist
+[02:58:30] !exclude .git
+[02:58:30] !exclude .git
+[02:58:55] watching internal\watching
+[02:58:55] watching internal\watching
+[02:59:01] watching internal\watching
+[02:59:01] watching internal\watching
+[02:59:09] !exclude .git
+[02:59:10] !exclude .git
+[03:02:22] watching internal\friends
+[03:02:22] watching internal\friends
+[03:02:41] watching internal\friends
+[03:02:41] watching internal\friends
+[03:02:59] watching internal\friends
+[03:02:59] watching internal\friends
+[03:03:26] watching internal\friends
+[03:03:26] watching internal\friends
+[03:03:34] !exclude .git
+[03:03:34] !exclude .git
+[03:03:56] watching internal\friends
+[03:03:56] watching internal\friends
+[03:04:29] !exclude .git
+[03:04:29] !exclude .git
+[03:04:55] watching internal\friends
+[03:05:03] !exclude .git
+[03:05:03] !exclude .git
+[03:05:43] !exclude .git
+[03:05:43] !exclude .git
+[03:06:50] watching internal\watchlist
+[03:06:50] watching internal\watchlist
+[03:06:50] watching internal\likes
+[03:06:50] watching internal\likes
+[03:06:50] watching internal\playlists
+[03:06:50] watching internal\playlists
+[03:06:50] failed to watch D:\Programming\Personal Projects\AuroraStream\lumo-user-svc\internal\playlists\playlists_test.go.6944844207470845941, error: GetFileAttributes: The system cannot find the file specified.
+[03:06:50] failed to watching D:\Programming\Personal Projects\AuroraStream\lumo-user-svc\internal\playlists, error: GetFileAttributes: The system cannot find the file specified.
+[03:06:50] watching internal\clerkwebhook
+[03:06:50] watching internal\likes
+[03:06:50] watching internal\users
+[03:06:51] !exclude .git
+[03:06:52] !exclude .git
+[03:07:41] watching internal\metrics
+[03:07:41] watching internal\metrics
+[03:07:55] !exclude .git
+[03:07:55] !exclude .git
+[03:09:20] !exclude .git
+[03:09:20] !exclude .git
+[03:11:15] !exclude .git
+[03:11:15] !exclude .git
+[03:13:17] !exclude .git
+[03:13:17] !exclude .git
+[03:19:36] !exclude .git
+[03:19:36] !exclude .git
+[03:19:36] !exclude .git
+[03:19:38] !exclude .git
+[03:19:38] !exclude .git
+[03:19:38] !exclude .git
+[03:19:38] !exclude .git
+[03:19:39] !exclude .git
+[03:19:39] !exclude .git
+[03:19:39] !exclude .git
+[03:19:39] !exclude .git
+[03:19:39] !exclude .git
+[03:39:34] !exclude .git
+[03:39:34] !exclude .git
+[03:39:34] !exclude .git
+[03:39:34] !exclude .git
+[03:39:34] !exclude .git
+[03:39:35] !exclude .git
+[03:39:35] !exclude .git
+[03:39:35] !exclude .git
+[03:39:35] !exclude .git
+[03:39:35] !exclude .git
+[05:50:36] Process Exit with Code: 1073807364
+[05:50:36] cleaning...
+2026/08/27 05:50:36 shutting down...
+[05:50:36] deleting D:\Programming\Personal Projects\AuroraStream\lumo-user-svc\tmp
+[05:50:38] see you again~
