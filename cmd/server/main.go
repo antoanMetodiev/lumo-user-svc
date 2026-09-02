@@ -102,6 +102,24 @@ func main() {
 	clerkwebhook.NewHandlers(cfg.ClerkWebhookSecret, clerkWebhookSvc).Register(mux)
 	heartbeat.Register(mux)
 
+	// db-keepalive is separate from StartKeepAlivePing's twice-daily
+	// in-process ticker above: that ticker only fires while this instance is
+	// already running, so it can't stop the DB from idling out while Render
+	// itself has the service asleep. This is a public, unauthenticated route
+	// (outside userScopedPaths/internalPaths) meant to be hit by an external
+	// cron so the request itself both wakes the instance and touches the DB.
+	mux.HandleFunc("GET /db-keepalive", func(w http.ResponseWriter, r *http.Request) {
+		pingCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		var one int
+		if err := pool.QueryRow(pingCtx, "SELECT 1").Scan(&one); err != nil {
+			log.Printf("db-keepalive: query failed: %v", err)
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
 	// management.endpoints.web.exposure.include=health — Render's own health
 	// check and any uptime monitor hit this.
 	mux.HandleFunc("GET /actuator/health", func(w http.ResponseWriter, r *http.Request) {
