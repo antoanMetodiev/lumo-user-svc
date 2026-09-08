@@ -126,6 +126,14 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"UP"}`))
 	})
+	// Plain, non-legacy-named alias of the endpoint above -- this is what
+	// lumo-api-gateway's heartbeat.StartFleetHealthPing pings on its own
+	// 2-minute schedule to keep every downstream service warm on Render's
+	// free tier, independent of an end user ever hitting this service.
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"UP"}`))
+	})
 
 	handler := reqlog.Middleware(
 		cors.Middleware(
