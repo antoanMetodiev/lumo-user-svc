@@ -33,10 +33,16 @@ func NewNotifyClient(gatewayURL, internalSecret string) *NotifyClient {
 // strings (not reusing the Notification* constants) since these describe
 // the live push, not the persisted notification row, even though today
 // every notification insert is paired with exactly one push of the same name.
+//
+// The last two carry no notification row of their own — they exist purely so
+// the other side's cached lists stop showing a request that was withdrawn or
+// a friendship that was ended (see Service.pushAsync).
 const (
 	EventFriendRequest         = "friend_request"
 	EventFriendRequestAccepted = "friend_request_accepted"
 	EventFriendRequestDeclined = "friend_request_declined"
+	EventFriendRequestCanceled = "friend_request_canceled"
+	EventFriendRemoved         = "friend_removed"
 )
 
 type wsEvent struct {

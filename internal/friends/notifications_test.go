@@ -13,7 +13,7 @@ import (
 
 const (
 	countNotificationsSQL   = "SELECT COUNT(*) FROM notifications WHERE clerk_id = $1"
-	consumeNotificationsSQL = "WITH deleted AS ( DELETE FROM notifications WHERE clerk_id = $1 RETURNING id, type, actor_id, created_at ) SELECT d.id, d.type, d.actor_id, u.display_name, u.profile_image_url, d.created_at FROM deleted d JOIN users u ON u.clerk_id = d.actor_id ORDER BY d.created_at DESC"
+	consumeNotificationsSQL = "WITH deleted AS ( DELETE FROM notifications WHERE clerk_id = $1 RETURNING id, type, actor_id, created_at ) SELECT d.id, d.type, d.actor_id, u.display_name, u.profile_image_url, d.created_at FROM deleted d LEFT JOIN users u ON u.clerk_id = d.actor_id ORDER BY d.created_at DESC"
 )
 
 func TestRepositoryInsertNotification(t *testing.T) {

@@ -102,23 +102,45 @@ func (r *Repository) FindByID(ctx context.Context, id uuid.UUID) (*FriendRequest
 
 // FindBetween returns the pending friend_requests row involving both clerk
 // ids regardless of which one is the requester, or (nil, nil) if none exists.
+//
+// ORDER BY created_at + LIMIT 1 rather than CollectExactlyOneRow: nothing at
+// the database level stops a pair from ending up with two rows (A→B and B→A
+// both inserted by two SendRequest calls that raced past each other's
+// FindBetween check), and CollectExactlyOneRow turned that into a permanent
+// ErrTooManyRows — every subsequent send/accept between those two people
+// failing with a 500 forever, with no way out from the UI. Taking the oldest
+// row instead means the pair just resolves through the request that was made
+// first, and the duplicate is cleaned up by the same accept/decline that
+// resolves it.
 func (r *Repository) FindBetween(ctx context.Context, a, b string) (*FriendRequest, error) {
 	rows, err := r.pool.Query(ctx,
-		"SELECT "+requestColumns+" FROM friend_requests WHERE (requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1)",
+		"SELECT "+requestColumns+" FROM friend_requests WHERE (requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1) ORDER BY created_at LIMIT 1",
 		a, b)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	fr, err := pgx.CollectExactlyOneRow(rows, scanRequest)
+	fr, err := pgx.CollectOneRow(rows, scanRequest)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
 	return &fr, nil
+}
+
+// DeleteBetween removes every pending request between two people in either
+// direction — used once a pair is resolved (accepted), so a duplicate
+// reverse-direction row left over from the race described on FindBetween
+// can't survive as a phantom "pending" request between two people who are
+// now already friends.
+func (r *Repository) DeleteBetween(ctx context.Context, a, b string) error {
+	_, err := r.pool.Exec(ctx,
+		"DELETE FROM friend_requests WHERE (requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1)",
+		a, b)
+	return err
 }
 
 // Insert also stamps requester_email/requester_display_name/addressee_email/
@@ -128,16 +150,31 @@ func (r *Repository) FindBetween(ctx context.Context, a, b string) (*FriendReque
 // app itself never reads these back (every API response already joins
 // against users live, which stays accurate even if someone renames their
 // account later — these columns are a snapshot, not a second source of truth).
+//
+// Because it's an INSERT...SELECT over users, a missing users row for either
+// participant makes it insert nothing at all while still returning a nil
+// error — which used to read as success all the way back up: the caller got
+// a FriendRequest carrying an id no row has, the addressee got a "you have a
+// friend request" push and notification, and their incoming list stayed
+// empty forever. (The realistic way to land there is a brand-new account
+// whose Clerk user.created webhook hasn't been processed yet.) Hence the
+// RowsAffected check: no row inserted is ErrUserNotFound, not success.
 func (r *Repository) Insert(ctx context.Context, fr *FriendRequest) error {
 	fr.ID = uuid.New()
-	_, err := r.pool.Exec(ctx, `
+	tag, err := r.pool.Exec(ctx, `
 		INSERT INTO friend_requests (id, requester_id, requester_email, requester_display_name,
 		                              addressee_id, addressee_email, addressee_display_name, created_at)
 		SELECT $1, $2, ru.email, ru.display_name, $3, au.email, au.display_name, $4
 		FROM users ru, users au
 		WHERE ru.clerk_id = $2 AND au.clerk_id = $3`,
 		fr.ID, fr.RequesterID, fr.AddresseeID, fr.CreatedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id uuid.UUID) error {
@@ -153,9 +190,18 @@ func (r *Repository) DeleteByID(ctx context.Context, id uuid.UUID) error {
 // user_a_email/user_a_display_name/user_b_email/user_b_display_name — see
 // Insert's doc comment for why (same reasoning, snapshot for humans reading
 // the raw table, not read back by the app).
+//
+// It shares Insert's INSERT...SELECT-over-users hazard, and here it was
+// worse: acceptRequest inserts the friendship and then deletes the request
+// row, so a silent zero-row insert destroyed the request while creating no
+// friendship — the request simply vanished from both people's lists and
+// neither became the other's friend, with a 200 reported to the accepter.
+// Zero rows here is ambiguous though (ON CONFLICT DO NOTHING also affects
+// none when they're already friends, which is a legitimate success), so the
+// rare zero-row path confirms which case it is before deciding.
 func (r *Repository) InsertFriendship(ctx context.Context, a, b string) error {
 	userA, userB := orderPair(a, b)
-	_, err := r.pool.Exec(ctx, `
+	tag, err := r.pool.Exec(ctx, `
 		INSERT INTO friendships (id, user_a_id, user_a_email, user_a_display_name,
 		                          user_b_id, user_b_email, user_b_display_name, created_at)
 		SELECT $1, $2, ua.email, ua.display_name, $3, ub.email, ub.display_name, $4
@@ -163,7 +209,21 @@ func (r *Repository) InsertFriendship(ctx context.Context, a, b string) error {
 		WHERE ua.clerk_id = $2 AND ub.clerk_id = $3
 		ON CONFLICT (user_a_id, user_b_id) DO NOTHING`,
 		uuid.New(), userA, userB, time.Now().UTC())
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() > 0 {
+		return nil
+	}
+
+	alreadyFriends, err := r.AreFriends(ctx, userA, userB)
+	if err != nil {
+		return err
+	}
+	if !alreadyFriends {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
 func (r *Repository) AreFriends(ctx context.Context, a, b string) (bool, error) {
@@ -336,24 +396,44 @@ const searchSelectColumns = `
 // (user_a_id, user_b_id) arrangements — same as ListFriendships already
 // does — sidesteps collation entirely instead of needing it to agree with
 // orderPair.
+//
+// The friend_requests side is a LATERAL ... LIMIT 1 rather than a plain
+// LEFT JOIN because nothing stops a pair from holding two pending rows (see
+// FindBetween) — a plain join duplicated that person in the search results,
+// once per row, each rendered as its own list entry.
 const searchJoins = `
 	FROM users u
 	LEFT JOIN friendships f
 	  ON (f.user_a_id = u.clerk_id AND f.user_b_id = $1)
 	  OR (f.user_a_id = $1 AND f.user_b_id = u.clerk_id)
-	LEFT JOIN friend_requests fr
-	  ON (fr.requester_id = u.clerk_id AND fr.addressee_id = $1)
-	  OR (fr.addressee_id = u.clerk_id AND fr.requester_id = $1)`
+	LEFT JOIN LATERAL (
+	  SELECT r.requester_id
+	  FROM friend_requests r
+	  WHERE (r.requester_id = u.clerk_id AND r.addressee_id = $1)
+	     OR (r.addressee_id = u.clerk_id AND r.requester_id = $1)
+	  ORDER BY r.created_at
+	  LIMIT 1
+	) fr ON TRUE`
 
 // SearchUsers mirrors lumo-movies-svc's SuggestActors query shape (LOWER+LIKE
-// substring match, prefix matches ranked first) applied to display_name.
+// substring match, prefix matches ranked first), matching on display_name or
+// email.
+//
+// Both are COALESCEd to ”: display_name is nullable, and comparing NULL with
+// LIKE yields NULL rather than false, so anyone who hadn't set a display name
+// was unfindable by search at all — they only ever appeared in the blank-query
+// RecentUsers listing, which drops off the moment someone actually types.
+// Email is matched (never returned — see SearchResultDTO) because it's the
+// one identifier people reliably know about each other when trying to add a
+// specific person rather than browse.
 func (r *Repository) SearchUsers(ctx context.Context, callerID, query string, limit int) ([]SearchResultDTO, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT `+searchSelectColumns+searchJoins+`
 		WHERE u.clerk_id <> $1
-		  AND LOWER(u.display_name) LIKE LOWER('%' || $2 || '%')
+		  AND (LOWER(COALESCE(u.display_name, '')) LIKE LOWER('%' || $2 || '%')
+		    OR LOWER(COALESCE(u.email, '')) LIKE LOWER('%' || $2 || '%'))
 		ORDER BY
-		  CASE WHEN LOWER(u.display_name) LIKE LOWER($2 || '%') THEN 0 ELSE 1 END,
+		  CASE WHEN LOWER(COALESCE(u.display_name, '')) LIKE LOWER($2 || '%') THEN 0 ELSE 1 END,
 		  u.display_name
 		LIMIT $3`,
 		callerID, query, limit)
@@ -411,8 +491,49 @@ func (s *Service) notifyAsync(ctx context.Context, targetClerkID, notifType, eve
 		}()
 		if err := s.repo.InsertNotification(detached, targetClerkID, notifType, actorID); err != nil {
 			log.Printf("friends: failed to insert %s notification for clerkId=%s: %v", notifType, targetClerkID, err)
+			// A push whose notification row failed to persist is worse than
+			// no push: the bell's count comes from that row, so the client
+			// would bump its badge on the event and then find nothing behind
+			// it, leaving a badge that never clears.
+			return
 		}
 		s.notifier.Notify(detached, targetClerkID, eventType, fr)
+	}()
+}
+
+// pushAsync is notifyAsync minus the persisted row — for state changes the
+// other side needs to re-render for (a request being withdrawn, a friendship
+// being ended) but that don't belong in the notification bell as something
+// that happened *to* them worth reading later.
+func (s *Service) pushAsync(ctx context.Context, targetClerkID, eventType string, fr *FriendRequest) {
+	detached := context.WithoutCancel(ctx)
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("friends: pushAsync panic: %v", rec)
+			}
+		}()
+		s.notifier.Notify(detached, targetClerkID, eventType, fr)
+	}()
+}
+
+// clearRequestNotification drops the "X sent you a friend request" row once
+// that request no longer exists — whether it was accepted, declined, or
+// withdrawn by the sender. It's a prompt to act on a pending request, not a
+// historical record, so leaving it behind meant a bell badge pointing at a
+// request that was already gone (and, for a withdrawn one, at a request the
+// recipient never even got the chance to see).
+func (s *Service) clearRequestNotification(ctx context.Context, addresseeID, requesterID string) {
+	detached := context.WithoutCancel(ctx)
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("friends: clearRequestNotification panic: %v", rec)
+			}
+		}()
+		if err := s.repo.DeleteNotification(detached, addresseeID, NotificationFriendRequest, requesterID); err != nil {
+			log.Printf("friends: failed to clear friend-request notification for clerkId=%s: %v", addresseeID, err)
+		}
 	}()
 }
 
@@ -421,23 +542,50 @@ var (
 	ErrUserNotFound = errors.New("user not found")
 )
 
+// SendOutcome is what a "send request" actually resolved to, since it isn't
+// always a new pending request: sending to someone who already has a pending
+// request out to you accepts it instead, and sending to someone you're
+// already friends with changes nothing. The handler previously returned a
+// bare (nil, nil) for both of those, which serialized to a literal `null`
+// body under a 200 — the frontend read that as plain success and drew a
+// "request sent, pending" state over someone who was, at that exact moment,
+// already a confirmed friend.
+type SendOutcome struct {
+	Status  string         `json:"status"`
+	Request *FriendRequest `json:"request,omitempty"`
+}
+
+const (
+	SendStatusPending = "PENDING"
+	SendStatusFriends = "FRIENDS"
+)
+
 // SendRequest is idempotent: resending to someone already pending just
 // returns the existing pending row unchanged, resending to someone already
-// a friend is a no-op (nil, nil — nothing new to report), and sending to
+// a friend reports FRIENDS without changing anything, and sending to
 // someone who already sent *us* a pending request accepts it on the spot
 // (moves it into friendships) instead of creating a second, reverse-direction
-// request row.
-func (s *Service) SendRequest(ctx context.Context, requesterID, addresseeID string) (*FriendRequest, error) {
+// request row. The SendOutcome says which of those happened — see its doc
+// comment for why that can't just be inferred from a 200.
+func (s *Service) SendRequest(ctx context.Context, requesterID, addresseeID string) (*SendOutcome, error) {
 	if requesterID == addresseeID {
 		return nil, ErrSelfRequest
 	}
 
-	exists, err := s.usersRepo.ExistsByClerkID(ctx, addresseeID)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, ErrUserNotFound
+	// Both sides are checked, not just the addressee: Insert is an
+	// INSERT...SELECT across users for *both* participants, so a caller
+	// missing from users (a brand-new account whose Clerk webhook hasn't
+	// landed yet) is just as unable to produce a row — and reporting that as
+	// "user not found" here is far more useful than the 500 the repository's
+	// own guard would otherwise raise.
+	for _, clerkID := range []string{requesterID, addresseeID} {
+		exists, err := s.usersRepo.ExistsByClerkID(ctx, clerkID)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, ErrUserNotFound
+		}
 	}
 
 	alreadyFriends, err := s.repo.AreFriends(ctx, requesterID, addresseeID)
@@ -445,7 +593,7 @@ func (s *Service) SendRequest(ctx context.Context, requesterID, addresseeID stri
 		return nil, err
 	}
 	if alreadyFriends {
-		return nil, nil
+		return &SendOutcome{Status: SendStatusFriends}, nil
 	}
 
 	existing, err := s.repo.FindBetween(ctx, requesterID, addresseeID)
@@ -458,10 +606,10 @@ func (s *Service) SendRequest(ctx context.Context, requesterID, addresseeID stri
 			if err := s.acceptRequest(ctx, existing); err != nil {
 				return nil, err
 			}
-			return nil, nil
+			return &SendOutcome{Status: SendStatusFriends}, nil
 		}
 		// We already sent one — idempotent, return the existing pending request.
-		return existing, nil
+		return &SendOutcome{Status: SendStatusPending, Request: existing}, nil
 	}
 
 	fr := &FriendRequest{RequesterID: requesterID, AddresseeID: addresseeID, CreatedAt: time.Now().UTC()}
@@ -471,20 +619,27 @@ func (s *Service) SendRequest(ctx context.Context, requesterID, addresseeID stri
 
 	s.notifyAsync(ctx, addresseeID, NotificationFriendRequest, EventFriendRequest, requesterID, fr)
 
-	return fr, nil
+	return &SendOutcome{Status: SendStatusPending, Request: fr}, nil
 }
 
 // acceptRequest is the shared "turn a pending request into a friendship"
 // step used by both Accept and SendRequest's auto-accept-on-reverse-pending
-// branch: insert into friendships, delete the now-fulfilled request row,
-// notify the original requester.
+// branch: insert into friendships, delete every pending request between the
+// pair (DeleteBetween rather than DeleteByID, so a duplicate
+// reverse-direction row can't outlive the friendship it's now contradicting
+// — see FindBetween), notify the original requester.
+//
+// The friendship insert has to come first and its error has to stop the
+// whole thing: deleting the request before knowing the friendship exists is
+// how a request could disappear without one replacing it.
 func (s *Service) acceptRequest(ctx context.Context, fr *FriendRequest) error {
 	if err := s.repo.InsertFriendship(ctx, fr.RequesterID, fr.AddresseeID); err != nil {
 		return err
 	}
-	if err := s.repo.DeleteByID(ctx, fr.ID); err != nil {
+	if err := s.repo.DeleteBetween(ctx, fr.RequesterID, fr.AddresseeID); err != nil {
 		return err
 	}
+	s.clearRequestNotification(ctx, fr.AddresseeID, fr.RequesterID)
 	s.notifyAsync(ctx, fr.RequesterID, NotificationFriendRequestAccepted, EventFriendRequestAccepted, fr.AddresseeID, fr)
 	return nil
 }
@@ -506,12 +661,24 @@ func (s *Service) CancelOrDecline(ctx context.Context, callerID string, id uuid.
 		return err
 	}
 
-	// Only notify when the addressee is the one declining someone else's
-	// request — the requester canceling their own outgoing request doesn't
-	// need to be told, they already know, they just did it.
+	// Either way the addressee's "X sent you a friend request" prompt is now
+	// pointing at nothing, so it goes with the request itself.
+	s.clearRequestNotification(ctx, fr.AddresseeID, fr.RequesterID)
+
 	if callerID == fr.AddresseeID {
 		s.notifyAsync(ctx, fr.RequesterID, NotificationFriendRequestDeclined, EventFriendRequestDeclined, callerID, fr)
+		return nil
 	}
+
+	// The requester canceling their own outgoing request doesn't need a
+	// notification — they already know, they just did it — but the addressee
+	// does need to hear about it, and used to hear nothing at all. Their
+	// incoming list kept showing the withdrawn request until the next poll,
+	// and accepting it in that window 404'd with no visible explanation and
+	// no list refresh, so the dead entry just sat there. This is a push with
+	// no notification row: a request being withdrawn isn't bell-worthy, it
+	// just means their list is stale.
+	s.pushAsync(ctx, fr.AddresseeID, EventFriendRequestCanceled, fr)
 	return nil
 }
 
@@ -532,8 +699,19 @@ func (s *Service) Accept(ctx context.Context, callerID string, id uuid.UUID) (bo
 	return true, nil
 }
 
+// Unfriend also pushes to the person being removed so their own friends
+// list, and everything gated on it, stops showing a friendship that no
+// longer exists — without it their session kept the ex-friend listed (and
+// kept their profile's likes/playlists unlocked, since the frontend derives
+// "is a friend" from that same cached list) until a full page reload. No
+// notification row: being unfriended is deliberately not something the bell
+// announces.
 func (s *Service) Unfriend(ctx context.Context, callerID, otherClerkID string) error {
-	return s.repo.DeleteFriendship(ctx, callerID, otherClerkID)
+	if err := s.repo.DeleteFriendship(ctx, callerID, otherClerkID); err != nil {
+		return err
+	}
+	s.pushAsync(ctx, otherClerkID, EventFriendRemoved, nil)
+	return nil
 }
 
 func (s *Service) ListFriends(ctx context.Context, clerkID string) ([]FriendDTO, error) {

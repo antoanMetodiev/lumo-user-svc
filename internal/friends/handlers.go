@@ -2,6 +2,7 @@ package friends
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -132,19 +133,19 @@ func (h *Handlers) sendRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fr, err := h.svc.SendRequest(r.Context(), clerkID, req.AddresseeID)
+	outcome, err := h.svc.SendRequest(r.Context(), clerkID, req.AddresseeID)
 	if err != nil {
-		switch err {
-		case ErrSelfRequest:
+		switch {
+		case errors.Is(err, ErrSelfRequest):
 			http.Error(w, "addresseeId: cannot send a friend request to yourself", http.StatusBadRequest)
-		case ErrUserNotFound:
+		case errors.Is(err, ErrUserNotFound):
 			http.Error(w, "addresseeId: user not found", http.StatusBadRequest)
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
 	}
-	writeJSON(w, fr)
+	writeJSON(w, outcome)
 }
 
 func (h *Handlers) cancelOrDecline(w http.ResponseWriter, r *http.Request) {

@@ -93,6 +93,9 @@ func TestHandlerSendRequestUserNotFoundReturns400WithMessage(t *testing.T) {
 	srv := newTestServer(t, svc)
 
 	mock.ExpectQuery(regexp.QuoteMeta(existsByClerkIDSQL)).
+		WithArgs("user_a").
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectQuery(regexp.QuoteMeta(existsByClerkIDSQL)).
 		WithArgs("ghost").
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
 
@@ -200,9 +203,7 @@ func TestHandlerSendRequestHappyPathReturns200JSON(t *testing.T) {
 	svc, mock, ch := newMockService(t)
 	srv := newTestServer(t, svc)
 
-	mock.ExpectQuery(regexp.QuoteMeta(existsByClerkIDSQL)).
-		WithArgs("user_b").
-		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+	expectSenderAndAddresseeExist(mock, "user_a", "user_b")
 	mock.ExpectQuery(regexp.QuoteMeta(areFriendsSQL)).
 		WithArgs("user_a", "user_b").
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
@@ -226,13 +227,49 @@ func TestHandlerSendRequestHappyPathReturns200JSON(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
-	var got FriendRequest
+	var got SendOutcome
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("decoding response: %v", err)
 	}
-	if got.RequesterID != "user_a" || got.AddresseeID != "user_b" {
-		t.Fatalf("unexpected body: %+v", got)
+	if got.Status != SendStatusPending {
+		t.Fatalf("status = %q, want %q", got.Status, SendStatusPending)
+	}
+	if got.Request == nil || got.Request.RequesterID != "user_a" || got.Request.AddresseeID != "user_b" {
+		t.Fatalf("unexpected body: %+v", got.Request)
 	}
 
 	waitForNotify(t, ch)
+}
+
+// TestHandlerSendRequestAlreadyFriendsReturnsFriendsStatus pins the half of
+// the contract the frontend reads: the response body has to say the two are
+// already friends. It used to be a bare `null` under a 200, which the UI took
+// for a freshly-sent request and drew a pending state over an existing
+// friendship.
+func TestHandlerSendRequestAlreadyFriendsReturnsFriendsStatus(t *testing.T) {
+	svc, mock, _ := newMockService(t)
+	srv := newTestServer(t, svc)
+
+	expectSenderAndAddresseeExist(mock, "user_a", "user_b")
+	mock.ExpectQuery(regexp.QuoteMeta(areFriendsSQL)).
+		WithArgs("user_a", "user_b").
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+	req := newAuthedRequest(t, http.MethodPost, srv.URL+"/friends/requests", "user_a", []byte(`{"addresseeId":"user_b"}`))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var got SendOutcome
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if got.Status != SendStatusFriends {
+		t.Fatalf("status = %q, want %q", got.Status, SendStatusFriends)
+	}
 }
