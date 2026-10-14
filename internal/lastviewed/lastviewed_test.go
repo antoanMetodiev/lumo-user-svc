@@ -12,6 +12,9 @@ import (
 	"lumo-user-svc/internal/models"
 )
 
+// deleteSameRecordSQL matches RecordView's first step, DeleteSameRecord.
+var deleteSameRecordSQL = `DELETE FROM last_viewed_items\s+WHERE clerk_id = \$1\s+AND \(title = \$2`
+
 func newMockRepo(t *testing.T) (*Repository, pgxmock.PgxPoolIface) {
 	t.Helper()
 	mock, err := pgxmock.NewPool()
@@ -161,8 +164,8 @@ func TestServiceRecordViewOrderDeleteEvictInsert(t *testing.T) {
 	newer := time.Now().UTC()
 	older := newer.Add(-24 * time.Hour)
 
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM last_viewed_items WHERE clerk_id = $1 AND title = $2")).
-		WithArgs("user_1", "New Movie").
+	mock.ExpectExec(deleteSameRecordSQL).
+		WithArgs("user_1", "New Movie", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM last_viewed_items WHERE clerk_id = $1")).
@@ -199,8 +202,8 @@ func TestServiceRecordViewUnderCapacitySkipsEviction(t *testing.T) {
 	repo, mock := newMockRepo(t)
 	svc := NewService(repo)
 
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM last_viewed_items WHERE clerk_id = $1 AND title = $2")).
-		WithArgs("user_1", "New Movie").
+	mock.ExpectExec(deleteSameRecordSQL).
+		WithArgs("user_1", "New Movie", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM last_viewed_items WHERE clerk_id = $1")).
@@ -233,8 +236,8 @@ func TestServiceRecordViewAtCapacityButEmptyOrderedListSkipsEviction(t *testing.
 	repo, mock := newMockRepo(t)
 	svc := NewService(repo)
 
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM last_viewed_items WHERE clerk_id = $1 AND title = $2")).
-		WithArgs("user_1", "New Movie").
+	mock.ExpectExec(deleteSameRecordSQL).
+		WithArgs("user_1", "New Movie", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM last_viewed_items WHERE clerk_id = $1")).
@@ -258,5 +261,32 @@ func TestServiceRecordViewAtCapacityButEmptyOrderedListSkipsEviction(t *testing.
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations (or an unexpected DeleteByID call): %v", err)
+	}
+}
+
+// TestServiceGetLastViewedOneEntryPerRecord: the same movie viewed in two
+// languages ("Inception", then "Генезис") was saved twice before the id-based
+// dedupe — the list shows it once, the newest; entries without an id still
+// dedupe by title.
+func TestServiceGetLastViewedOneEntryPerRecord(t *testing.T) {
+	repo, mock := newMockRepo(t)
+	svc := NewService(repo)
+
+	tmdb := "27205"
+	now := time.Now().UTC()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT " + itemColumns + " FROM last_viewed_items WHERE clerk_id = $1 ORDER BY viewed_at DESC")).
+		WithArgs("user_1").
+		WillReturnRows(pgxmock.NewRows(itemColumnNames).
+			AddRow(uuid.New(), "user_1", "MOVIE", &tmdb, (*string)(nil), (*string)(nil), "Генезис", (*string)(nil), (*string)(nil), (*string)(nil), now).
+			AddRow(uuid.New(), "user_1", "MOVIE", &tmdb, (*string)(nil), (*string)(nil), "Inception", (*string)(nil), (*string)(nil), (*string)(nil), now.Add(-time.Hour)).
+			AddRow(uuid.New(), "user_1", "MOVIE", (*string)(nil), (*string)(nil), (*string)(nil), "No Id", (*string)(nil), (*string)(nil), (*string)(nil), now.Add(-2*time.Hour)).
+			AddRow(uuid.New(), "user_1", "MOVIE", (*string)(nil), (*string)(nil), (*string)(nil), "No Id", (*string)(nil), (*string)(nil), (*string)(nil), now.Add(-3*time.Hour)))
+
+	items, err := svc.GetLastViewed(context.Background(), "user_1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 2 || items[0].Title != "Генезис" || items[1].Title != "No Id" {
+		t.Fatalf("got %d items %+v, want [Генезис, No Id]", len(items), items)
 	}
 }

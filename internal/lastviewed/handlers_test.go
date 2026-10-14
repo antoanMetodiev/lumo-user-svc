@@ -128,8 +128,8 @@ func TestRecordViewReturns200NotCreated(t *testing.T) {
 	svc := NewService(repo)
 	h := newTestHandler(svc)
 
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM last_viewed_items WHERE clerk_id = $1 AND title = $2")).
-		WithArgs("user_1", "Some Movie").
+	mock.ExpectExec(deleteSameRecordSQL).
+		WithArgs("user_1", "Some Movie", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM last_viewed_items WHERE clerk_id = $1")).
 		WithArgs("user_1").
