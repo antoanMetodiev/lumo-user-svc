@@ -31,12 +31,13 @@ import (
 	"lumo-user-svc/internal/users"
 	"lumo-user-svc/internal/watching"
 	"lumo-user-svc/internal/watchlist"
+	"lumo-user-svc/internal/watchprogress"
 )
 
 // userScopedPaths mirrors SecurityConfig.USER_SCOPED_PATHS exactly — plus
 // "/watching", a new-feature addition with no Java original (see friends'
-// own package doc comment for the precedent).
-var userScopedPaths = []string{"/user/me", "/watchlist", "/last-viewed", "/friends", "/likes", "/playlists", "/watching", "/ai-assistant"}
+// own package doc comment for the precedent) and "/watch-progress".
+var userScopedPaths = []string{"/user/me", "/watchlist", "/last-viewed", "/friends", "/likes", "/playlists", "/watching", "/watch-progress", "/ai-assistant"}
 
 // internalPaths mirrors SecurityConfig.INTERNAL_PATHS exactly.
 var internalPaths = []string{"/internal"}
@@ -84,6 +85,12 @@ func main() {
 	watchingSvc := watching.NewService(friendsRepo, usersRepo, friendsNotifier)
 	go watchingSvc.StartSweeper(ctx)
 
+	watchProgressRepo := watchprogress.NewRepository(pool)
+	// Its table is new; without it only its own routes fail.
+	if err := watchProgressRepo.EnsureSchema(ctx); err != nil {
+		log.Printf("watch_progress table not ready: %v", err)
+	}
+
 	aiAssistantRepo := aiassistant.NewRepository(pool)
 	aiAssistantSvc := aiassistant.NewService(aiAssistantRepo)
 
@@ -98,6 +105,7 @@ func main() {
 	friends.NewHandlers(friendsSvc).Register(mux)
 	playlists.NewHandlers(playlistsSvc).Register(mux)
 	watching.NewHandlers(watchingSvc).Register(mux)
+	watchprogress.NewHandlers(watchProgressRepo).Register(mux)
 	aiassistant.NewHandlers(aiAssistantSvc).Register(mux)
 	clerkwebhook.NewHandlers(cfg.ClerkWebhookSecret, clerkWebhookSvc).Register(mux)
 	heartbeat.Register(mux)
