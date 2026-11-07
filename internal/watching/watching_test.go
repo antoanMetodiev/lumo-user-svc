@@ -479,3 +479,13 @@ func TestServiceListFriendsWatchingPropagatesError(t *testing.T) {
 		t.Fatal("expected ListFriendships error to propagate, got nil")
 	}
 }
+
+func TestStatusSameIgnoresPositionAndPause(t *testing.T) {
+	paused, playing := true, false
+	at := func(seconds float64) *float64 { return &seconds }
+
+	a := Status{TmdbID: "1", Type: "movie", Position: at(60), Paused: &playing}
+	if !a.same(Status{TmdbID: "1", Type: "movie", Position: at(65), Paused: &paused}) {
+		t.Fatal("expected a heartbeat that only moves the position or pauses to be same (no toast for friends)")
+	}
+}

@@ -2,6 +2,7 @@ package watching
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"strings"
 
@@ -31,6 +32,22 @@ type setBody struct {
 	Title   string `json:"title"`
 	Season  *int   `json:"season,omitempty"`
 	Episode *int   `json:"episode,omitempty"`
+
+	Position *float64 `json:"position,omitempty"`
+	Duration *float64 `json:"duration,omitempty"`
+	Paused   *bool    `json:"paused,omitempty"`
+}
+
+// maxSeconds bounds a position or runtime: 100 hours.
+const maxSeconds = 360000
+
+// seconds keeps a reported time only when it's a sane one.
+func seconds(value *float64) *float64 {
+	if value == nil || math.IsNaN(*value) || *value < 0 || *value > maxSeconds {
+		return nil
+	}
+	rounded := math.Round(*value)
+	return &rounded
 }
 
 func (h *Handlers) set(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +73,10 @@ func (h *Handlers) set(w http.ResponseWriter, r *http.Request) {
 		Title:   body.Title,
 		Season:  body.Season,
 		Episode: body.Episode,
+
+		Position: seconds(body.Position),
+		Duration: seconds(body.Duration),
+		Paused:   body.Paused,
 	})
 	w.WriteHeader(http.StatusNoContent)
 }

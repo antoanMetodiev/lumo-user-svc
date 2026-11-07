@@ -44,12 +44,21 @@ type Status struct {
 	Title   string `json:"title"`
 	Season  *int   `json:"season,omitempty"`
 	Episode *int   `json:"episode,omitempty"`
+
+	// Where in it, as the player reports: absent for the players that
+	// report nothing. Refreshed by every heartbeat and never pushed: friends
+	// poll /watching/friends every few seconds anyway, and every push shows
+	// them a "now watching" toast.
+	Position *float64 `json:"position,omitempty"`
+	Duration *float64 `json:"duration,omitempty"`
+	Paused   *bool    `json:"paused,omitempty"`
 }
 
 // same reports whether two statuses describe the same thing being
 // watched — used to skip re-notifying friends on a heartbeat that isn't
 // reporting anything new (only the season/episode within the same title
-// changing, or the title itself changing, counts as new).
+// changing, or the title itself changing, counts as new — not the position
+// or a pause, see Status.Position).
 func (s Status) same(other Status) bool {
 	return s.TmdbID == other.TmdbID && s.Type == other.Type && intEq(s.Season, other.Season) && intEq(s.Episode, other.Episode)
 }

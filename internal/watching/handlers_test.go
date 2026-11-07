@@ -301,3 +301,37 @@ func TestHandlerListFriendsWatchingErrorReturns500(t *testing.T) {
 		t.Fatalf("expected 500, got %d", resp.StatusCode)
 	}
 }
+
+func TestHandlerSetKeepsOnlySanePositions(t *testing.T) {
+	ns := newNotifyServer(t)
+
+	svc, _, friendsMock, _, usersMock := newHandlerTestService(t, ns.srv.URL)
+	srv := newTestServer(t, svc)
+	expectOneFriendAndNoUser(friendsMock, usersMock, "user_1", "friend_1")
+
+	body := []byte(`{"tmdbId":"42","type":"movie","title":"A Movie","position":2820.4,"duration":-5,"paused":true}`)
+	req := authedRequest(t, http.MethodPut, srv.URL+"/watching", "user_1", body)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	got := svc.store.get("user_1")
+	if got == nil || got.Position == nil || *got.Position != 2820 {
+		t.Fatalf("expected the position rounded to 2820, got %+v", got)
+	}
+	if got.Duration != nil {
+		t.Fatalf("expected a negative duration to be dropped, got %v", *got.Duration)
+	}
+	if got.Paused == nil || !*got.Paused {
+		t.Fatal("expected paused to round-trip")
+	}
+
+	ns.waitForRequest(t, shortWait)
+}
